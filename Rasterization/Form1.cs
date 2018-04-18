@@ -29,46 +29,92 @@ namespace Rasterization
             grp = Graphics.FromImage(bmp);
         }
 
-        private void drawLine()
+        private void drawLine(int thickness)
         {
-            int x1 = 0, x2 = 0, y1 = 0, y2 = 0, yy = 0;
-            if (p1.X <= p2.X)
+            int x1 = p1.X, x2 = p2.X, y1 = p1.Y, y2 = p2.Y;
+
+            int d, dx, dy, dE, dNE, xi, yi;
+            int x = x1, y = y1;
+            
+            if (x1 < x2)
             {
-                x1 = p1.X;
-                x2 = p2.X;
-                y1 = p1.Y;
-                y2 = p2.Y;
+                xi = 1;
+                dx = x2 - x1;
             }
             else
             {
-                x1 = p2.X;
-                x2 = p1.X;
-                y1 = p2.Y;
-                y2 = p1.Y;
+                xi = -1;
+                dx = x1 - x2;
             }
-            int dx = x2 - x1;
-            int dy = y2 - y1;
-
-            int d = 2 * dy - dx; // initial value of d
-            int dE = 2 * dy; // increment used when moving to E
-            int dNE = 2 * (dy - dx); // increment used when movint to NE
-            int x = x1, y = y1;
-            bmp.SetPixel(x, y, Color.Black);
-            while (x < x2)
+            
+            if (y1 < y2)
             {
-                if (d < 0) // move to E
+                yi = 1;
+                dy = y2 - y1;
+            }
+            else
+            {
+                yi = -1;
+                dy = y1 - y2;
+            }
+           
+            bmp.SetPixel(x, y, Color.Black);
+
+            if (dx > dy)
+            {
+                d = dy * 2 - dx;
+                dE = dy * 2;
+                dNE = (dy - dx) * 2;
+                
+                while (x != x2)
                 {
-                    d += dE;
-                    x++;
+                    if (d < 0)
+                    {
+                        d += dE;
+                        x += xi;
+                    }
+                    else
+                    {
+                        d += dNE;
+                        x += xi;
+                        y += yi;
+                    }
+                    bmp.SetPixel(x, y, Color.Black);
+                    for (int i = 1; i <= thickness / 2; i++)
+                    {
+                        bmp.SetPixel(x, y + i, Color.Black);
+                        bmp.SetPixel(x, y - i, Color.Black);
+                    }
                 }
-                else // move to NE
+            }
+
+            else
+            {
+                d = dx * 2 - dy;
+                dE = dx * 2;
+                dNE = (dx - dy) * 2;
+                
+                while (y != y2)
                 {
-                    d += dNE;
-                    x++;
-                    y++;
+                    if (d < 0)
+                    {
+                        d += dE;
+                        y += yi;
+                    }
+                    else
+                    {
+                        d += dNE;
+                        x += xi;
+                        y += yi;
+                    }
+                    bmp.SetPixel(x, y, Color.Black);
+                    for (int i = 1; i <= thickness / 2; i++)
+                    {
+                        bmp.SetPixel(x + i, y, Color.Black);
+                        bmp.SetPixel(x - i, y, Color.Black);
+                    }
                 }
-                bmp.SetPixel(x, y, Color.Black);
-            }
+            }
         }
 
         private void drawCircle()
@@ -105,74 +151,73 @@ namespace Rasterization
             }
         }
 
-        private void drawThickLine(int thickness)
+        float cov(float d, float r)
         {
-            int x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-            if (Math.Abs(p2.X - p1.X) >= Math.Abs(p2.Y - p1.Y))
-            {
-                if (p1.X <= p2.X)
-                {
-                    x1 = p1.X;
-                    x2 = p2.X;
-                    y1 = p1.Y;
-                    y2 = p2.Y;
-                }
-                else
-                {
-                    x1 = p2.X;
-                    x2 = p1.X;
-                    y1 = p2.Y;
-                    y2 = p1.Y;
-                }
+            if (d <= r) return (float)(0.5 - (d * Math.Sqrt(r * r - d * d)) / (Math.PI * r * r) - 1 / (Math.PI * Math.Asin(d / r)));
+            else return 0;
+        }
 
-                float dy = y2 - y1;
-                float dx = x2 - x1;
-                float m = dy / dx;
-                float y = y1;
-                for (int x = x1; x <= x2; ++x)
-                {
-                    bmp.SetPixel(x, (int)y, Color.Black);
-                    for (int i = 1; i <= thickness / 2; i++)
-                    {
-                        bmp.SetPixel(x, (int)y + i, Color.Black);
-                        bmp.SetPixel(x, (int)y - i, Color.Black);
-                    }
-                    y += m;
-                }
+        float coverage(float thickness, float distance)
+        {
+            float c;
+
+            if(thickness/2 <= distance)
+            {
+                c = cov(distance - thickness / 2, (float)0.5);
             }
             else
             {
-                if (p1.Y <= p2.Y)
-                {
-                    x1 = p1.X;
-                    x2 = p2.X;
-                    y1 = p1.Y;
-                    y2 = p2.Y;
-                }
-                else
-                {
-                    x1 = p2.X;
-                    x2 = p1.X;
-                    y1 = p2.Y;
-                    y2 = p1.Y;
-                }
+                c = 1 - cov(distance - thickness / 2, (float)0.5);
+            }
 
-                float dy = y2 - y1;
-                float dx = x2 - x1;
-                float m = dx / dy;
-                float x = x1;
-                for (int y = y1; y <= y2; ++y)
+            return c;
+        }
+
+        int IntensifyPixel(int x, int y, float thickness, float distance)
+        {
+            float cov = coverage(thickness, distance);
+            if (cov >= 0)
+            {
+                bmp.SetPixel(x, y, Color.FromArgb((int)(255 * cov), (int)(255 * cov), (int)(255 * cov)));
+            }
+            return (int)cov;
+        }
+
+        void ThickAntialiasedLine(int x1, int y1, int x2, int y2, float thickness)
+        {
+            //initial values in Bresenham;s algorithm
+            int dx = x2 - x1, dy = y2 - y1;
+            int dE = 2 * dy, dNE = 2 * (dy - dx);
+            int d = 2 * dy - dx;
+            int two_v_dx = 0; //numerator, v=0 for the first pixel
+            float invDenom = (float)(1 / (2 * Math.Sqrt(dx * dx + dy * dy))); //inverted denominator
+            float two_dx_invDenom = 2 * dx * invDenom; //precomputed constant
+            int x = x1, y = y1;
+            int i;
+            IntensifyPixel(x, y, thickness, 0);
+            for (i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom) > 0; ++i) ;
+            for (i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom) > 0; ++i) ;
+            while (x < x2)
+            {
+                ++x;
+                if (d < 0) // move to E
                 {
-                    bmp.SetPixel((int)x, y, Color.Black);
-                    for (int i = 1; i <= thickness / 2; i++)
-                    {
-                        bmp.SetPixel((int)x + i, y, Color.Black);
-                        bmp.SetPixel((int)x - i, y, Color.Black);
-                    }
-                    x += m;
+                    two_v_dx = d + dx;
+                    d += dE;
                 }
+                else // move to NE
+                {
+                    two_v_dx = d - dx;
+                    d += dNE;
+                    ++y;
+                }
+                // Now set the chosen pixel and its neighbors
+                IntensifyPixel(x, y, thickness, two_v_dx * invDenom);
+                for (i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom - two_v_dx * invDenom) > 0; ++i) ;
+                for (i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom + two_v_dx * invDenom) > 0; ++i) ;
             }
         }
+
 
         private void pictureBox1_Paint(object sender, PaintEventArgs e)
         {
@@ -251,7 +296,7 @@ namespace Rasterization
         {
             if(LineButton.Checked)
             {
-                drawLine();
+                drawLine(1);
             }
             if (CircleButton.Checked)
             {
@@ -259,11 +304,11 @@ namespace Rasterization
             }
             if (antiAlButton.Checked)
             {
-                
+                ThickAntialiasedLine(p1.X, p1.Y, p2.X, p2.Y, Int32.Parse(comboBoxA.Text));
             }
             if (tLineButton.Checked)
             {
-                drawThickLine(Int32.Parse(comboBoxT.Text));
+                drawLine(Int32.Parse(comboBoxT.Text));
             }
 
             p1 = new Point();
