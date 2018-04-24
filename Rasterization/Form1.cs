@@ -153,7 +153,7 @@ namespace Rasterization
 
         double cov(double d, double r)
         {
-            if (d <= r) return (0.5 - ((d * Math.Sqrt(r * r - d * d)) / (Math.PI * r * r)) - (1 / (Math.PI * Math.Asin(d / r))));
+            if (Math.Abs(d) <= r) return (1 / Math.PI * Math.Acos(d / r) - (d / (Math.PI * r * r)) * Math.Sqrt(r * r - d * d));
             else return 0;
         }
 
@@ -178,10 +178,7 @@ namespace Rasterization
             double cov = coverage(thickness, distance);
             if (cov > 0)
             {
-
-                double c = cov * 255;
-                if (c > 255) c = 255;
-                if (c < 0) c = 0;
+                double c =(cov * 255);
                 bmp.SetPixel(x, y, Color.FromArgb((int)c, (int)c, (int)c));
             }
             return cov;
@@ -223,14 +220,12 @@ namespace Rasterization
                 dNE = (dy - dx) * 2;
 
                 int two_v_dx = 0;
-                double invDenom = 1 / (2 * Math.Sqrt(dx * dx + dy * dy));
-                double two_dx_invDenom = 2 * dx * invDenom;
-
-                bmp.SetPixel(x, y, Color.Black);
+                double invDenom = 1.0 / (2.0 * Math.Sqrt(dx * dx + dy * dy));
+                double two_dx_invDenom = 2.0 * (dx * invDenom);
 
                 double c = IntensifyPixel(x, y, thickness, 0);
-                for (int i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom) > 0; ++i) ;
-                for (int i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom) > 0; ++i) ;
+                for (int i = 1; IntensifyPixel(x, y - i * yi, thickness, i * two_dx_invDenom) < 0; ++i) ;
+                for (int i = 1; IntensifyPixel(x, y + i * yi, thickness, i * two_dx_invDenom) < 0; ++i) ;
 
                 while (x != x2)
                 {
@@ -247,11 +242,24 @@ namespace Rasterization
                         y += yi;
                     }
 
-                    bmp.SetPixel(x, y, Color.Black);
-
                     IntensifyPixel(x, y, thickness, two_v_dx * invDenom);
-                    for (int i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom - two_v_dx * invDenom) > 0; ++i) ;
-                    for (int i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom + two_v_dx * invDenom) > 0; ++i) ;
+                    for (int i = 1; IntensifyPixel(x, y + i*yi, thickness, i * two_dx_invDenom - two_v_dx * invDenom) != 0; ++i) ;
+                    for (int i = 1; IntensifyPixel(x, y - i*yi, thickness, i * two_dx_invDenom + two_v_dx * invDenom) != 0; ++i) ;
+
+                    bmp.SetPixel(x, y, Color.Black);
+                    for (int i = 1; i <= thickness / 2; i++)
+                    {
+                        Color color = bmp.GetPixel(x, y + i);
+                        if (color == Color.FromArgb(255, 255, 255))
+                        {
+                            bmp.SetPixel(x, y + i, Color.Black);
+                        }
+                        color = bmp.GetPixel(x, y - i);
+                        if (color == Color.FromArgb(255, 255, 255))
+                        {
+                            bmp.SetPixel(x, y - i, Color.Black);
+                        }
+                    }
                 }
             }
             else
@@ -264,11 +272,9 @@ namespace Rasterization
                 double invDenom = 1 / (2 * Math.Sqrt(dx * dx + dy * dy));
                 double two_dy_invDenom = 2 * dy * invDenom;
 
-                bmp.SetPixel(x, y, Color.Black);
-
                 double c = IntensifyPixel(x, y, thickness, 0);
-                for (int i = 1; IntensifyPixel(x + i, y, thickness, i * two_dy_invDenom) > 0; ++i) ;
-                for (int i = 1; IntensifyPixel(x - i, y, thickness, i * two_dy_invDenom) > 0; ++i) ;
+                for (int i = 1; IntensifyPixel(x + i * xi, y, thickness, i * two_dy_invDenom) > 0; ++i) ;
+                for (int i = 1; IntensifyPixel(x - i * xi, y, thickness, i * two_dy_invDenom) > 0; ++i) ;
 
                 while (y != y2)
                 {
@@ -285,11 +291,24 @@ namespace Rasterization
                         x += xi;
                     }
 
-                    bmp.SetPixel(x, y, Color.Black);
-
                     IntensifyPixel(x, y, thickness, two_v_dy * invDenom);
-                    for (int i = 1; IntensifyPixel(x + i, y, thickness, i * two_dy_invDenom - two_v_dy * invDenom) > 0; ++i) ;
-                    for (int i = 1; IntensifyPixel(x - i, y, thickness, i * two_dy_invDenom + two_v_dy * invDenom) > 0; ++i) ;
+                    for (int i = 1; IntensifyPixel(x + i*xi, y, thickness, i * two_dy_invDenom - two_v_dy * invDenom) > 0; ++i) ;
+                    for (int i = 1; IntensifyPixel(x - i*xi, y, thickness, i * two_dy_invDenom + two_v_dy * invDenom) > 0; ++i) ;
+
+                    bmp.SetPixel(x, y, Color.Black);
+                    for (int i = 1; i <= thickness / 2; i++)
+                    {
+                        Color color = bmp.GetPixel(x + i, y);
+                        if (color == Color.FromArgb(255,255,255))
+                        {
+                            bmp.SetPixel(x + i, y, Color.Black);
+                        }
+                        color = bmp.GetPixel(x - i, y);
+                        if (color == Color.FromArgb(255, 255, 255))
+                        {
+                            bmp.SetPixel(x - i, y, Color.Black);
+                        }
+                    }
                 }
             }
         }
@@ -411,7 +430,6 @@ namespace Rasterization
             if (p1.IsEmpty) button1.BackColor = Color.Silver;
             else button1.BackColor = Color.PaleGreen;
         }
-        
     }
 }
 
